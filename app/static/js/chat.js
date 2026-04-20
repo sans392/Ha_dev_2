@@ -302,6 +302,16 @@ toggleDebugBtn.addEventListener('click', () => {
 function connectWS(sessionId, userId) {
     if (ws) { ws.close(); ws = null; }
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    
+    // Сбросить состояние стриминга и stage перед новым подключением
+    if (streamingContentEl) {
+        const streamEl = document.getElementById('streaming-msg');
+        if (streamEl) streamEl.remove();
+        streamingContentEl = null;
+        streamingBuffer = '';
+    }
+    resetStageState();
+    
     setConnStatus('connecting');
     sendBtn.disabled = true;
 
@@ -325,6 +335,14 @@ function connectWS(sessionId, userId) {
     ws.onclose = () => {
         setConnStatus('disconnected');
         sendBtn.disabled = true;
+        // Сбросить состояние стриминга и stage при закрытии соединения
+        if (streamingContentEl) {
+            const streamEl = document.getElementById('streaming-msg');
+            if (streamEl) streamEl.remove();
+            streamingContentEl = null;
+            streamingBuffer = '';
+        }
+        resetStageState();
         reconnectTimer = setTimeout(() => {
             if (currentSessionId === sessionId) connectWS(sessionId, userId);
         }, 3000);
@@ -334,6 +352,14 @@ function connectWS(sessionId, userId) {
 function handleWsMessage(data) {
     switch (data.type) {
         case 'history': {
+            // Сбросить состояние стриминга перед загрузкой истории
+            if (streamingContentEl) {
+                const streamEl = document.getElementById('streaming-msg');
+                if (streamEl) streamEl.remove();
+                streamingContentEl = null;
+                streamingBuffer = '';
+            }
+            resetStageState();
             clearMessages();
             const msgs = data.messages || [];
             if (msgs.length === 0) {
@@ -383,7 +409,13 @@ function sendMessage() {
     hideEmptyState();
     appendMessage('user', text);
     resetStageState();
-    streamingContentEl = null;
+    // Сбросить состояние стриминга перед отправкой нового сообщения
+    if (streamingContentEl) {
+        const streamEl = document.getElementById('streaming-msg');
+        if (streamEl) streamEl.remove();
+        streamingContentEl = null;
+        streamingBuffer = '';
+    }
 
     ws.send(JSON.stringify({ message: text }));
     msgInput.value = '';
@@ -436,6 +468,13 @@ function renderSessionsList(sessions) {
 
 async function switchSession(sessionId) {
     currentSessionId = sessionId;
+    // Сбросить состояние стриминга перед переключением сессии
+    if (streamingContentEl) {
+        const streamEl = document.getElementById('streaming-msg');
+        if (streamEl) streamEl.remove();
+        streamingContentEl = null;
+        streamingBuffer = '';
+    }
     clearMessages();
     lastDebug = null;
     resetStageState();
