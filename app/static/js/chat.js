@@ -117,6 +117,11 @@ function resetStageState() {
     stageCompleted = [];
     stageActive = null;
     firstTokenReceived = false;
+    // Always clear streaming state completely
+    const streamEl = document.getElementById('streaming-msg');
+    if (streamEl) streamEl.remove();
+    streamingContentEl = null;
+    streamingBuffer = '';
     renderStageIndicator();
 }
 
@@ -154,7 +159,10 @@ function onStageEnd(stage) {
 
 // --- Streaming message ---
 function startStreamingMessage() {
-    if (streamingContentEl) return;
+    // First ensure any existing streaming element is fully removed
+    const existingStreamEl = document.getElementById('streaming-msg');
+    if (existingStreamEl) existingStreamEl.remove();
+    
     streamingBuffer = '';
     firstTokenReceived = true;
 
@@ -177,7 +185,13 @@ function startStreamingMessage() {
 }
 
 function appendStreamToken(token) {
-    if (!streamingContentEl) startStreamingMessage();
+    // Critical: always verify the streaming element exists in DOM
+    if (!streamingContentEl || !document.body.contains(streamingContentEl)) {
+        // Streaming element is stale or missing — start fresh
+        streamingContentEl = null;
+        streamingBuffer = '';
+        startStreamingMessage();
+    }
     streamingBuffer += token;
     // Append escaped token directly — no re-render, no flickering
     streamingContentEl.insertAdjacentHTML('beforeend', escapeHtml(token).replace(/\n/g, '<br>'));
@@ -189,10 +203,14 @@ function finishStreaming(fullText) {
     if (msgEl) {
         const bubble = msgEl.querySelector('.msg-bubble');
         bubble.innerHTML = renderMarkdown(fullText || streamingBuffer);
+        // Remove the cursor element after finishing
+        const cursor = msgEl.querySelector('.stream-cursor');
+        if (cursor) cursor.remove();
     } else if (fullText) {
         // No streaming happened (blocked path etc.) — add as regular message
         appendMessage('assistant', fullText);
     }
+    // Clear all streaming state
     streamingContentEl = null;
     streamingBuffer = '';
 }
@@ -303,13 +321,6 @@ function connectWS(sessionId, userId) {
     if (ws) { ws.close(); ws = null; }
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     
-    // Сбросить состояние стриминга и stage перед новым подключением
-    if (streamingContentEl) {
-        const streamEl = document.getElementById('streaming-msg');
-        if (streamEl) streamEl.remove();
-        streamingContentEl = null;
-        streamingBuffer = '';
-    }
     resetStageState();
     
     setConnStatus('connecting');
@@ -335,13 +346,6 @@ function connectWS(sessionId, userId) {
     ws.onclose = () => {
         setConnStatus('disconnected');
         sendBtn.disabled = true;
-        // Сбросить состояние стриминга и stage при закрытии соединения
-        if (streamingContentEl) {
-            const streamEl = document.getElementById('streaming-msg');
-            if (streamEl) streamEl.remove();
-            streamingContentEl = null;
-            streamingBuffer = '';
-        }
         resetStageState();
         reconnectTimer = setTimeout(() => {
             if (currentSessionId === sessionId) connectWS(sessionId, userId);
@@ -352,13 +356,6 @@ function connectWS(sessionId, userId) {
 function handleWsMessage(data) {
     switch (data.type) {
         case 'history': {
-            // Сбросить состояние стриминга перед загрузкой истории
-            if (streamingContentEl) {
-                const streamEl = document.getElementById('streaming-msg');
-                if (streamEl) streamEl.remove();
-                streamingContentEl = null;
-                streamingBuffer = '';
-            }
             resetStageState();
             clearMessages();
             const msgs = data.messages || [];
@@ -392,9 +389,6 @@ function handleWsMessage(data) {
 
         case 'error': {
             resetStageState();
-            const streamEl = document.getElementById('streaming-msg');
-            if (streamEl) streamEl.remove();
-            streamingContentEl = null;
             appendMessage('assistant', '⚠️ ' + (data.message || 'Произошла ошибка'));
             break;
         }
@@ -409,13 +403,6 @@ function sendMessage() {
     hideEmptyState();
     appendMessage('user', text);
     resetStageState();
-    // Сбросить состояние стриминга перед отправкой нового сообщения
-    if (streamingContentEl) {
-        const streamEl = document.getElementById('streaming-msg');
-        if (streamEl) streamEl.remove();
-        streamingContentEl = null;
-        streamingBuffer = '';
-    }
 
     ws.send(JSON.stringify({ message: text }));
     msgInput.value = '';
@@ -468,13 +455,6 @@ function renderSessionsList(sessions) {
 
 async function switchSession(sessionId) {
     currentSessionId = sessionId;
-    // Сбросить состояние стриминга перед переключением сессии
-    if (streamingContentEl) {
-        const streamEl = document.getElementById('streaming-msg');
-        if (streamEl) streamEl.remove();
-        streamingContentEl = null;
-        streamingBuffer = '';
-    }
     clearMessages();
     lastDebug = null;
     resetStageState();
