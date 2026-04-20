@@ -303,13 +303,14 @@ function connectWS(sessionId, userId) {
     if (ws) { ws.close(); ws = null; }
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     
-    // Сбросить состояние стриминга перед новым подключением
+    // Сбросить состояние стриминга и stage перед новым подключением
     if (streamingContentEl) {
         const streamEl = document.getElementById('streaming-msg');
         if (streamEl) streamEl.remove();
         streamingContentEl = null;
         streamingBuffer = '';
     }
+    resetStageState();
     
     setConnStatus('connecting');
     sendBtn.disabled = true;
@@ -334,6 +335,14 @@ function connectWS(sessionId, userId) {
     ws.onclose = () => {
         setConnStatus('disconnected');
         sendBtn.disabled = true;
+        // Сбросить состояние стриминга и stage при закрытии соединения
+        if (streamingContentEl) {
+            const streamEl = document.getElementById('streaming-msg');
+            if (streamEl) streamEl.remove();
+            streamingContentEl = null;
+            streamingBuffer = '';
+        }
+        resetStageState();
         reconnectTimer = setTimeout(() => {
             if (currentSessionId === sessionId) connectWS(sessionId, userId);
         }, 3000);
@@ -350,6 +359,7 @@ function handleWsMessage(data) {
                 streamingContentEl = null;
                 streamingBuffer = '';
             }
+            resetStageState();
             clearMessages();
             const msgs = data.messages || [];
             if (msgs.length === 0) {
