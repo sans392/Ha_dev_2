@@ -117,6 +117,13 @@ function resetStageState() {
     stageCompleted = [];
     stageActive = null;
     firstTokenReceived = false;
+    // Also ensure streaming state is cleared
+    if (streamingContentEl) {
+        const streamEl = document.getElementById('streaming-msg');
+        if (streamEl) streamEl.remove();
+        streamingContentEl = null;
+        streamingBuffer = '';
+    }
     renderStageIndicator();
 }
 
@@ -189,6 +196,9 @@ function finishStreaming(fullText) {
     if (msgEl) {
         const bubble = msgEl.querySelector('.msg-bubble');
         bubble.innerHTML = renderMarkdown(fullText || streamingBuffer);
+        // Remove the cursor element after finishing
+        const cursor = msgEl.querySelector('.stream-cursor');
+        if (cursor) cursor.remove();
     } else if (fullText) {
         // No streaming happened (blocked path etc.) — add as regular message
         appendMessage('assistant', fullText);
@@ -303,13 +313,7 @@ function connectWS(sessionId, userId) {
     if (ws) { ws.close(); ws = null; }
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     
-    // Сбросить состояние стриминга и stage перед новым подключением
-    if (streamingContentEl) {
-        const streamEl = document.getElementById('streaming-msg');
-        if (streamEl) streamEl.remove();
-        streamingContentEl = null;
-        streamingBuffer = '';
-    }
+    // resetStageState already handles clearing streaming state
     resetStageState();
     
     setConnStatus('connecting');
@@ -335,13 +339,7 @@ function connectWS(sessionId, userId) {
     ws.onclose = () => {
         setConnStatus('disconnected');
         sendBtn.disabled = true;
-        // Сбросить состояние стриминга и stage при закрытии соединения
-        if (streamingContentEl) {
-            const streamEl = document.getElementById('streaming-msg');
-            if (streamEl) streamEl.remove();
-            streamingContentEl = null;
-            streamingBuffer = '';
-        }
+        // resetStageState already handles clearing streaming state
         resetStageState();
         reconnectTimer = setTimeout(() => {
             if (currentSessionId === sessionId) connectWS(sessionId, userId);
@@ -352,13 +350,7 @@ function connectWS(sessionId, userId) {
 function handleWsMessage(data) {
     switch (data.type) {
         case 'history': {
-            // Сбросить состояние стриминга перед загрузкой истории
-            if (streamingContentEl) {
-                const streamEl = document.getElementById('streaming-msg');
-                if (streamEl) streamEl.remove();
-                streamingContentEl = null;
-                streamingBuffer = '';
-            }
+            // resetStageState already handles clearing streaming state
             resetStageState();
             clearMessages();
             const msgs = data.messages || [];
@@ -380,6 +372,11 @@ function handleWsMessage(data) {
 
         case 'token':
             hideEmptyState();
+            // Ensure we're not appending to a stale streaming element
+            if (!streamingContentEl || !document.getElementById('stream-content')) {
+                streamingContentEl = null;
+                streamingBuffer = '';
+            }
             appendStreamToken(data.token);
             break;
 
@@ -392,9 +389,6 @@ function handleWsMessage(data) {
 
         case 'error': {
             resetStageState();
-            const streamEl = document.getElementById('streaming-msg');
-            if (streamEl) streamEl.remove();
-            streamingContentEl = null;
             appendMessage('assistant', '⚠️ ' + (data.message || 'Произошла ошибка'));
             break;
         }
@@ -408,14 +402,8 @@ function sendMessage() {
 
     hideEmptyState();
     appendMessage('user', text);
+    // resetStageState already handles clearing streaming state
     resetStageState();
-    // Сбросить состояние стриминга перед отправкой нового сообщения
-    if (streamingContentEl) {
-        const streamEl = document.getElementById('streaming-msg');
-        if (streamEl) streamEl.remove();
-        streamingContentEl = null;
-        streamingBuffer = '';
-    }
 
     ws.send(JSON.stringify({ message: text }));
     msgInput.value = '';
@@ -468,13 +456,7 @@ function renderSessionsList(sessions) {
 
 async function switchSession(sessionId) {
     currentSessionId = sessionId;
-    // Сбросить состояние стриминга перед переключением сессии
-    if (streamingContentEl) {
-        const streamEl = document.getElementById('streaming-msg');
-        if (streamEl) streamEl.remove();
-        streamingContentEl = null;
-        streamingBuffer = '';
-    }
+    // resetStageState already handles clearing streaming state
     clearMessages();
     lastDebug = null;
     resetStageState();
