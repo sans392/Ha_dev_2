@@ -1,38 +1,66 @@
-# Python
+```
+# Compiled and build artifacts
+*.pyc
 __pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
+*.o
+*.obj
 dist/
 build/
-.eggs/
+target/
 
-# Виртуальное окружение
+# Dependencies
 .venv/
 venv/
-env/
-
-# Переменные окружения (секреты)
-.env
-
-# База данных
-data/
-
-# Тесты / покрытие
+node_modules/
+.mypy_cache/
 .pytest_cache/
-.coverage
-htmlcov/
+.gradle/
 
-# IDE
-.idea/
-.vscode/
+# Logs and temp files
+*.log
+*.tmp
 *.swp
 *.swo
 
-# Alembic — версии остаются в git, но не кэш
-alembic/__pycache__/
+# Environment
+.env
+.env.local
+*.env.*
 
-# Docker
-*.log
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+```
