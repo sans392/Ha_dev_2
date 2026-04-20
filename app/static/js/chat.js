@@ -117,13 +117,11 @@ function resetStageState() {
     stageCompleted = [];
     stageActive = null;
     firstTokenReceived = false;
-    // Also ensure streaming state is cleared
-    if (streamingContentEl) {
-        const streamEl = document.getElementById('streaming-msg');
-        if (streamEl) streamEl.remove();
-        streamingContentEl = null;
-        streamingBuffer = '';
-    }
+    // Always clear streaming state completely
+    const streamEl = document.getElementById('streaming-msg');
+    if (streamEl) streamEl.remove();
+    streamingContentEl = null;
+    streamingBuffer = '';
     renderStageIndicator();
 }
 
@@ -161,7 +159,10 @@ function onStageEnd(stage) {
 
 // --- Streaming message ---
 function startStreamingMessage() {
-    if (streamingContentEl) return;
+    // First ensure any existing streaming element is fully removed
+    const existingStreamEl = document.getElementById('streaming-msg');
+    if (existingStreamEl) existingStreamEl.remove();
+    
     streamingBuffer = '';
     firstTokenReceived = true;
 
@@ -184,7 +185,13 @@ function startStreamingMessage() {
 }
 
 function appendStreamToken(token) {
-    if (!streamingContentEl) startStreamingMessage();
+    // Critical: always verify the streaming element exists in DOM
+    if (!streamingContentEl || !document.body.contains(streamingContentEl)) {
+        // Streaming element is stale or missing — start fresh
+        streamingContentEl = null;
+        streamingBuffer = '';
+        startStreamingMessage();
+    }
     streamingBuffer += token;
     // Append escaped token directly — no re-render, no flickering
     streamingContentEl.insertAdjacentHTML('beforeend', escapeHtml(token).replace(/\n/g, '<br>'));
@@ -203,6 +210,7 @@ function finishStreaming(fullText) {
         // No streaming happened (blocked path etc.) — add as regular message
         appendMessage('assistant', fullText);
     }
+    // Clear all streaming state
     streamingContentEl = null;
     streamingBuffer = '';
 }
@@ -313,7 +321,6 @@ function connectWS(sessionId, userId) {
     if (ws) { ws.close(); ws = null; }
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     
-    // resetStageState already handles clearing streaming state
     resetStageState();
     
     setConnStatus('connecting');
@@ -339,7 +346,6 @@ function connectWS(sessionId, userId) {
     ws.onclose = () => {
         setConnStatus('disconnected');
         sendBtn.disabled = true;
-        // resetStageState already handles clearing streaming state
         resetStageState();
         reconnectTimer = setTimeout(() => {
             if (currentSessionId === sessionId) connectWS(sessionId, userId);
@@ -350,7 +356,6 @@ function connectWS(sessionId, userId) {
 function handleWsMessage(data) {
     switch (data.type) {
         case 'history': {
-            // resetStageState already handles clearing streaming state
             resetStageState();
             clearMessages();
             const msgs = data.messages || [];
@@ -372,11 +377,6 @@ function handleWsMessage(data) {
 
         case 'token':
             hideEmptyState();
-            // Ensure we're not appending to a stale streaming element
-            if (!streamingContentEl || !document.getElementById('stream-content')) {
-                streamingContentEl = null;
-                streamingBuffer = '';
-            }
             appendStreamToken(data.token);
             break;
 
@@ -402,7 +402,6 @@ function sendMessage() {
 
     hideEmptyState();
     appendMessage('user', text);
-    // resetStageState already handles clearing streaming state
     resetStageState();
 
     ws.send(JSON.stringify({ message: text }));
@@ -456,7 +455,6 @@ function renderSessionsList(sessions) {
 
 async function switchSession(sessionId) {
     currentSessionId = sessionId;
-    // resetStageState already handles clearing streaming state
     clearMessages();
     lastDebug = null;
     resetStageState();
